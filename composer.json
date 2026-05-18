@@ -1,0 +1,22 @@
+{
+    "name": "ai-search-optimizer/ai-search-optimizer",
+    "description": "AI Search Optimizer plugin for WordPress",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "ASO\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ASO\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "require": {},
+    "require-dev": {},
+    "config": {
+        "sort-packages": true
+    }
+}
