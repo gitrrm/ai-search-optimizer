@@ -2,11 +2,11 @@
 
 namespace ASO\Services;
 
-use ASO\SEO\SchemaDetector;
+use ASO\SEO\FaqDetector;
+use ASO\SEO\LlmsDetector;
 use ASO\SEO\OpenGraphDetector;
 use ASO\SEO\RobotsDetector;
-use ASO\SEO\LlmsDetector;
-use ASO\SEO\FaqDetector;
+use ASO\SEO\SchemaDetector;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -15,67 +15,51 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AnalyzerService {
 
 	public function analyze() {
-
-		$schema = new SchemaDetector();
-
-		$opengraph = new OpenGraphDetector();
-
-		$robots = new RobotsDetector();
-
-		$llms = new LlmsDetector();
-
-		$faq = new FaqDetector();
-
-		$llms_result = $llms->analyze();
-
-		$faq_result = $faq->analyze();
-
-		$checks = array(
-
-			'schema' => array(
-				'status' => $schema->has_schema(),
-				'weight' => 20,
-			),
-
-			'opengraph' => array(
-				'status' => $opengraph->has_opengraph(),
-				'weight' => 20,
-			),
-
-			'robots' => array(
-				'status' => $robots->has_robots(),
-				'weight' => 20,
-			),
-
-			'llms' => array(
-				'status' => (
-					$llms_result['score'] > 0
-				),
-
-				'weight' => $llms_result['score'],
-			),
-
-			'faq' => array(
-				'status' => (
-					$faq_result['score'] > 0
-				),
-
-				'weight' => $faq_result['score'],
-			),
+		$results = array(
+			'schema'    => $this->analyze_schema(),
+			'opengraph' => $this->analyze_opengraph(),
+			'robots'    => $this->analyze_robots(),
+			'llms'      => $this->analyze_llms(),
+			'faq'       => $this->analyze_faq(),
 		);
 
-		$score = 0;
+		$scoring_service = new ScoringService();
+		$score = $scoring_service->calculate( $results );
 
-		foreach ( $checks as $check ) {
-
-			if ( $check['status'] ) {
-				$score += $check['weight'];
-			}
-		}
+		$recommendation_service = new RecommendationService();
+		$recommendations = $recommendation_service->generate( $results );
 
 		return array(
-			'score'  => $score,
-			'checks' => $checks,
+			'score'           => $score['score'],
+			'max'             => $score['max_score'],
+			'checks'          => $score['checks'],
+			'results'         => $results,
+			'recommendations' => $recommendations,
 		);
+	}
+
+	private function analyze_schema() {
+		$detector = new SchemaDetector();
+		return $detector->analyze();
+	}
+
+	private function analyze_opengraph() {
+		$detector = new OpenGraphDetector();
+		return $detector->analyze();
+	}
+
+	private function analyze_robots() {
+		$detector = new RobotsDetector();
+		return $detector->analyze();
+	}
+
+	private function analyze_llms() {
+		$detector = new LlmsDetector();
+		return $detector->analyze();
+	}
+
+	private function analyze_faq() {
+		$detector = new FaqDetector();
+		return $detector->analyze();
 	}
 }

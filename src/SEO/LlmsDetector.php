@@ -9,76 +9,51 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LlmsDetector {
 
 	public function analyze() {
+		$llms_result = $this->check_llms_file();
 
-		$result = array(
-			'llms_file'      => false,
-			'ai_robots'      => false,
-			'schema_support' => false,
-			'score'          => 0,
+		return array(
+			'llms_file' => $llms_result,
+			'status'    => ! empty( $llms_result['available'] ),
+		);
+	}
+
+	private function check_llms_file() {
+		$response = wp_safe_remote_get(
+			home_url( '/llms.txt' ),
+			array( 'timeout' => 8 )
 		);
 
-		// Check llms.txt
-		$response = wp_remote_get(
-			home_url( '/llms.txt' )
-		);
-
-		if (
-			! is_wp_error( $response )
-			&&
-			200 === wp_remote_retrieve_response_code(
-				$response
-			)
-		) {
-
-			$result['llms_file'] = true;
-
-			$result['score'] += 10;
-		}
-
-		// Check robots AI directives
-		$robots = wp_remote_get(
-			home_url( '/robots.txt' )
-		);
-
-		if ( ! is_wp_error( $robots ) ) {
-
-			$body = wp_remote_retrieve_body(
-				$robots
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'available' => false,
+				'status'    => 0,
+				'error'     => $response->get_error_message(),
 			);
-
-			if (
-				false !== stripos(
-					$body,
-					'GPTBot'
-				)
-				||
-				false !== stripos(
-					$body,
-					'Google-Extended'
-				)
-				||
-				false !== stripos(
-					$body,
-					'CCBot'
-				)
-			) {
-
-				$result['ai_robots'] = true;
-
-				$result['score'] += 5;
-			}
 		}
 
-		// Schema fallback
-		$schema = new SchemaDetector();
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body        = wp_remote_retrieve_body( $response );
 
-		if ( $schema->has_schema() ) {
-
-			$result['schema_support'] = true;
-
-			$result['score'] += 5;
+		if ( 200 !== $status_code ) {
+			return array(
+				'available' => false,
+				'status'    => $status_code,
+				'error'     => 'llms.txt was not found.',
+			);
 		}
 
-		return $result;
+		if ( empty( trim( $body ) ) ) {
+			return array(
+				'available' => false,
+				'status'    => $status_code,
+				'error'     => 'llms.txt exists but is empty.',
+			);
+		}
+
+		return array(
+			'available' => true,
+			'status'    => $status_code,
+			'error'     => '',
+		);
 	}
 }

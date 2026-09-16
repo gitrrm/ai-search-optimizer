@@ -2,183 +2,100 @@
 
 namespace ASO\SEO;
 
-if (! defined('ABSPATH')) {
-    exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
-class FaqDetector
-{
+class FaqDetector {
 
-    public function analyze()
-    {
+	public function analyze() {
+		$post_id = $this->get_front_page_id();
 
-        $result = array(
-            'faq_schema' => false,
-            'faq_block'  => false,
-            'source'     => '',
-            'score'      => 0,
-        );
+		if ( empty( $post_id ) ) {
+			return array(
+				'status'     => false,
+				'faq_schema' => false,
+				'faq_blocks' => false,
+				'faq_count'  => 0,
+				'error'      => 'A static front page could not be identified.',
+			);
+		}
 
-        // $schema = $this->detect_schema();
-        $schema = $this->has_faq_schema();
+		$content = get_post_field( 'post_content', $post_id );
 
-        if ($schema) {
+		if ( empty( $content ) ) {
+			return array(
+				'status'     => false,
+				'faq_schema' => false,
+				'faq_blocks' => false,
+				'faq_count'  => 0,
+				'error'      => 'The front page does not contain any content.',
+			);
+		}
 
-            $result['faq_schema'] = true;
+		$faq_items  = $this->extract_faq_blocks( $content );
+		$faq_schema = $this->has_faq_schema( $content );
 
-            $result['source'] = 'schema';
+		return array(
+			'status'     => $faq_schema || ! empty( $faq_items ),
+			'faq_schema' => $faq_schema,
+			'faq_blocks' => ! empty( $faq_items ),
+			'faq_count'  => count( $faq_items ),
+			'error'      => '',
+		);
+	}
 
-            $result['score'] += 10;
-        }
+	public function has_faq() {
+		$result = $this->analyze();
+		return ! empty( $result['status'] );
+	}
 
-        $block = $this->detect_blocks();
+	private function get_front_page_id() {
+		if ( 'page' === get_option( 'show_on_front' ) ) {
+			return (int) get_option( 'page_on_front' );
+		}
+		return (int) get_option( 'page_for_posts' );
+	}
 
-        if ($block) {
+	private function has_faq_schema( $content ) {
+		if ( false !== stripos( $content, '"@type":"FAQPage"' ) ) {
+			return true;
+		}
+		return false !== stripos( $content, '"@type": "FAQPage"' );
+	}
 
-            $result['faq_block'] = true;
+	private function extract_faq_blocks( $content ) {
+		$blocks = parse_blocks( $content );
+		$faq_items = array();
+		$this->walk_blocks( $blocks, $faq_items );
+		return $faq_items;
+	}
 
-            $result['source'] = $block;
+	private function walk_blocks( $blocks, &$faq_items ) {
+		foreach ( $blocks as $block ) {
+			$block_name = isset( $block['blockName'] ) ? strtolower( (string) $block['blockName'] ) : '';
 
-            $result['score'] += 5;
-        }
+			if ( '' !== $block_name && false !== strpos( $block_name, 'faq' ) ) {
+				$question = '';
+				if ( isset( $block['attrs']['question'] ) ) {
+					$question = $block['attrs']['question'];
+				}
+				if ( empty( $question ) && ! empty( $block['innerHTML'] ) ) {
+					$question = wp_strip_all_tags( $block['innerHTML'] );
+				}
+				$question = trim( wp_strip_all_tags( $question ) );
 
-        return $result;
-    }
+				if ( '' !== $question ) {
+					$faq_items[] = array(
+						'question' => $question,
+						'block'    => $block_name,
+					);
+				}
+			}
 
-    private function detect_schema()
-    {
-
-        $response = wp_remote_get(
-            home_url('/')
-        );
-
-        if (is_wp_error($response)) {
-            return false;
-        }
-
-        $html = wp_remote_retrieve_body(
-            $response
-        );
-
-        if (
-            false !== stripos(
-                $html,
-                '"@type":"FAQPage"'
-            )
-        ) {
-            return 'custom';
-        }
-
-        if (
-            false !== stripos(
-                $html,
-                'acceptedAnswer'
-            )
-        ) {
-            return 'schema';
-        }
-
-        return false;
-    }
-
-    private function detect_blocks()
-    {
-
-        $posts = get_posts(
-            array(
-                'post_type'      => 'any',
-                'post_status'    => 'publish',
-                'posts_per_page' => 20,
-            )
-        );
-
-        $supported = array(
-            'yoast/faq-block'      => 'yoast',
-            'yoast-seo/faq-block'  => 'yoast',
-
-            'rank-math/faq-block'  => 'rankmath',
-
-            'aioseo/faq'           => 'aioseo',
-            'aioseo/faq-block'     => 'aioseo',
-            'aioseo/faq-page'      => 'aioseo',
-        );
-
-        foreach ($posts as $post) {
-
-            foreach ($supported as $block => $source) {
-
-                if (
-                    has_block(
-                        $block,
-                        $post
-                    )
-                ) {
-                    return $source;
-                }
-            }
-        }
-
-        return false;
-    }
-    private function has_faq_schema()
-    {
-
-        $posts = get_posts(
-            array(
-                'post_type'      => array(
-                    'post',
-                    'page',
-                ),
-
-                'post_status'    => 'publish',
-
-                'posts_per_page' => 10,
-            )
-        );
-
-        foreach ($posts as $post) {
-
-            $response = wp_remote_get(
-                get_permalink(
-                    $post->ID
-                )
-            );
-
-            if (is_wp_error($response)) {
-                continue;
-            }
-
-            $html = wp_remote_retrieve_body(
-                $response
-            );
-
-            $patterns = array(
-                'FAQPage',
-
-                '"@type":"FAQPage"',
-                '"@type": "FAQPage"',
-
-                '"@type":["FAQPage"]',
-                '"@type": ["FAQPage"]',
-
-                'acceptedAnswer',
-                'mainEntity',
-                'Question',
-            );
-
-            foreach ($patterns as $pattern) {
-
-                if (
-                    false !== stripos(
-                        $html,
-                        $pattern
-                    )
-                ) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$this->walk_blocks( $block['innerBlocks'], $faq_items );
+			}
+		}
+	}
 }

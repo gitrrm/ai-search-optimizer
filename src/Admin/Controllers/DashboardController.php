@@ -2,26 +2,24 @@
 
 namespace ASO\Admin\Controllers;
 
-use ASO\SEO\SchemaDetector;
 use ASO\Services\AnalyzerService;
 
-if (! defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class DashboardController
-{
+class DashboardController {
 
-	public function get_dashboard_data()
-	{
-
+	public function get_dashboard_data() {
 		$analyzer = new AnalyzerService();
-
-		$result = $analyzer->analyze();
+		$result   = $analyzer->analyze();
 
 		return array(
-			'ai_score' => $result['score'],
-			'checks'   => $result['checks'],
+			'ai_score'        => $result['score'],
+			'max_score'       => $result['max'],
+			'checks'          => $result['checks'],
+			'results'         => $result['results'],
+			'recommendations' => $result['recommendations'],
 		);
 	}
 }

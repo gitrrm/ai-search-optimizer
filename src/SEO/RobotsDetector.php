@@ -8,74 +8,163 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class RobotsDetector {
 
+	private $ai_crawlers = array(
+		'GPTBot',
+		'Google-Extended',
+		'CCBot',
+	);
+
+	public function analyze() {
+
+		$response = wp_safe_remote_get(
+			home_url( '/robots.txt' ),
+			array( 'timeout' => 8 )
+		);
+
+		$body        = '';
+		$source      = 'url';
+		$status_code = 0;
+
+		if ( ! is_wp_error( $response ) ) {
+			$status_code = wp_remote_retrieve_response_code( $response );
+			$body        = wp_remote_retrieve_body( $response );
+		}
+
+		if ( 200 !== $status_code || empty( trim( $body ) ) ) {
+			$virtual_robots = $this->get_virtual_robots();
+
+			if ( ! empty( $virtual_robots ) ) {
+				$body   = $virtual_robots;
+				$source = 'wordpress';
+			}
+		}
+
+		if ( empty( trim( $body ) ) ) {
+			return array(
+				'status'       => false,
+				'available'    => false,
+				'source'       => '',
+				'ai_crawlers'  => array(),
+				'has_ai_rules' => false,
+				'error'        => 'robots.txt is not available.',
+			);
+		}
+
+		$groups = $this->parse_robots_groups( $body );
+		$crawler_status = array();
+
+		foreach ( $this->ai_crawlers as $crawler ) {
+			$crawler_status[ $crawler ] = $this->analyze_crawler( $groups, $crawler );
+		}
+
+		$has_ai_rules = false;
+		foreach ( $crawler_status as $crawler ) {
+			if ( ! empty( $crawler['specific_rule'] ) ) {
+				$has_ai_rules = true;
+				break;
+			}
+		}
+
+		return array(
+			'status'       => true,
+			'available'    => true,
+			'source'       => $source,
+			'ai_crawlers'  => $crawler_status,
+			'has_ai_rules' => $has_ai_rules,
+			'error'        => '',
+		);
+	}
+
 	public function has_robots() {
-
-		if ( $this->check_wp_robots() ) {
-			return true;
-		}
-
-		if ( $this->check_virtual_robots() ) {
-			return true;
-		}
-
-		if ( $this->check_file_robots() ) {
-			return true;
-		}
-
-		if ( $this->check_blog_public() ) {
-			return true;
-		}
-
-		return false;
+		$result = $this->analyze();
+		return ! empty( $result['status'] );
 	}
 
-	private function check_wp_robots() {
+	private function get_virtual_robots() {
+		$robots = apply_filters( 'robots_txt', '', true );
+		return is_string( $robots ) ? trim( $robots ) : '';
+	}
 
-		if ( ! function_exists( 'wp_robots' ) ) {
-			return false;
+	private function parse_robots_groups( $robots_txt ) {
+		$lines  = preg_split( '/\r\n|\r|\n/', $robots_txt );
+		$groups = array();
+		$agents = array();
+		$rules  = array();
+
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			if ( '' === $line || 0 === strpos( $line, '#' ) ) {
+				continue;
+			}
+
+			if ( 0 === stripos( $line, 'User-agent:' ) ) {
+				$user_agent = trim( substr( $line, strlen( 'User-agent:' ) ) );
+
+				if ( ! empty( $rules ) ) {
+					$groups[] = array( 'agents' => $agents, 'rules' => $rules );
+					$agents = array();
+					$rules  = array();
+				}
+
+				if ( '' !== $user_agent ) {
+					$agents[] = $user_agent;
+				}
+				continue;
+			}
+
+			if ( 0 === stripos( $line, 'Disallow:' ) || 0 === stripos( $line, 'Allow:' ) ) {
+				$parts = explode( ':', $line, 2 );
+				$rules[] = array(
+					'directive' => strtolower( trim( $parts[0] ) ),
+					'path'      => isset( $parts[1] ) ? trim( $parts[1] ) : '',
+				);
+			}
 		}
 
-		$robots = apply_filters(
-			'wp_robots',
-			array()
-		);
-
-		return ! empty( $robots );
-	}
-
-	private function check_virtual_robots() {
-
-		$response = wp_remote_get(
-			home_url( '/?robots=1' )
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return false;
+		if ( ! empty( $agents ) ) {
+			$groups[] = array( 'agents' => $agents, 'rules' => $rules );
 		}
 
-		$body = wp_remote_retrieve_body(
-			$response
-		);
-
-		return false !== stripos(
-			$body,
-			'user-agent'
-		);
+		return $groups;
 	}
 
-	private function check_file_robots() {
+	private function analyze_crawler( $groups, $crawler ) {
+		$specific_groups = array();
+		$wildcard_groups = array();
 
-		$file = ABSPATH . 'robots.txt';
+		foreach ( $groups as $group ) {
+			foreach ( $group['agents'] as $agent ) {
+				if ( 0 === strcasecmp( $agent, $crawler ) ) {
+					$specific_groups[] = $group;
+				}
+				if ( '*' === $agent ) {
+					$wildcard_groups[] = $group;
+				}
+			}
+		}
 
-		return file_exists( $file );
-	}
+		$selected_groups = ! empty( $specific_groups ) ? $specific_groups : $wildcard_groups;
+		$disallow_all = false;
+		$allow_root   = false;
 
-	private function check_blog_public() {
+		foreach ( $selected_groups as $group ) {
+			foreach ( $group['rules'] as $rule ) {
+				if ( 'disallow' === $rule['directive'] && '/' === $rule['path'] ) {
+					$disallow_all = true;
+				}
+				if ( 'allow' === $rule['directive'] && '/' === $rule['path'] ) {
+					$allow_root = true;
+					$disallow_all = false;
+				}
+			}
+		}
 
-		return (
-			'1' === get_option(
-				'blog_public'
-			)
+		return array(
+			'found'         => ! empty( $selected_groups ),
+			'specific_rule' => ! empty( $specific_groups ),
+			'allowed'       => ! $disallow_all,
+			'disallow_all'  => $disallow_all,
+			'allow_root'    => $allow_root,
 		);
 	}
 }
