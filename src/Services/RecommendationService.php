@@ -8,10 +8,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class RecommendationService {
 
+	/**
+	 * Generate recommendations from analysis results.
+	 *
+	 * @param array $results Detector results.
+	 * @return array
+	 */
 	public function generate( $results ) {
+
 		$recommendations = array();
 
 		if ( empty( $results['schema']['status'] ) ) {
+
 			$recommendations[] = array(
 				'key'      => 'schema',
 				'priority' => 'high',
@@ -21,11 +29,19 @@ class RecommendationService {
 		}
 
 		if ( empty( $results['opengraph']['status'] ) ) {
-			$missing = ! empty( $results['opengraph']['missing'] ) ? $results['opengraph']['missing'] : array();
+
+			$missing = array();
+
+			if ( ! empty( $results['opengraph']['missing'] ) ) {
+				$missing = $results['opengraph']['missing'];
+			}
+
 			$message = 'Add Open Graph metadata to the homepage.';
+
 			if ( ! empty( $missing ) ) {
 				$message .= ' Missing: ' . implode( ', ', $missing ) . '.';
 			}
+
 			$recommendations[] = array(
 				'key'      => 'opengraph',
 				'priority' => 'medium',
@@ -35,15 +51,20 @@ class RecommendationService {
 		}
 
 		if ( empty( $results['robots']['available'] ) ) {
+
 			$recommendations[] = array(
 				'key'      => 'robots',
 				'priority' => 'high',
 				'title'    => 'Make robots.txt available',
 				'message'  => 'Ensure your website exposes a valid robots.txt file and review crawler access rules.',
 			);
+
 		} elseif ( ! empty( $results['robots']['ai_crawlers'] ) ) {
+
 			foreach ( $results['robots']['ai_crawlers'] as $crawler => $crawler_data ) {
+
 				if ( ! empty( $crawler_data['disallow_all'] ) ) {
+
 					$recommendations[] = array(
 						'key'      => 'robots-' . sanitize_title( $crawler ),
 						'priority' => 'high',
@@ -55,6 +76,7 @@ class RecommendationService {
 		}
 
 		if ( empty( $results['llms']['status'] ) ) {
+
 			$recommendations[] = array(
 				'key'      => 'llms',
 				'priority' => 'medium',
@@ -64,6 +86,7 @@ class RecommendationService {
 		}
 
 		if ( empty( $results['faq']['status'] ) ) {
+
 			$recommendations[] = array(
 				'key'      => 'faq',
 				'priority' => 'low',

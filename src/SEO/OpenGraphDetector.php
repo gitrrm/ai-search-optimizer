@@ -84,6 +84,11 @@ class OpenGraphDetector {
 
 		$tags = array();
 
+		/*
+		 * Extract individual meta elements first.
+		 * This allows property/content attributes to appear
+		 * in either order.
+		 */
 		$pattern = '/<meta\b[^>]*>/i';
 
 		if ( ! preg_match_all( $pattern, $html, $matches ) ) {

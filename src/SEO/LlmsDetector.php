@@ -8,7 +8,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class LlmsDetector {
 
+	/**
+	 * Analyze llms.txt and AI crawler information.
+	 *
+	 * @return array
+	 */
 	public function analyze() {
+
 		$llms_result = $this->check_llms_file();
 
 		return array(
@@ -17,10 +23,18 @@ class LlmsDetector {
 		);
 	}
 
+	/**
+	 * Check whether llms.txt is available.
+	 *
+	 * @return array
+	 */
 	private function check_llms_file() {
+
 		$response = wp_safe_remote_get(
 			home_url( '/llms.txt' ),
-			array( 'timeout' => 8 )
+			array(
+				'timeout' => 8,
+			)
 		);
 
 		if ( is_wp_error( $response ) ) {

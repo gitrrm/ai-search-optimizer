@@ -81,7 +81,7 @@ class SchemaDetector {
 
 		$blocks = array();
 
-		$pattern = '/<script[^>]+type=[\'\"]application\/ld\+json[\'\"][^>]*>(.*?)<\/script>/is';
+		$pattern = '/<script[^>]+type=[\'"]application\/ld\+json[\'"][^>]*>(.*?)<\/script>/is';
 
 		if ( ! preg_match_all( $pattern, $html, $matches ) ) {
 			return $blocks;
@@ -105,8 +105,8 @@ class SchemaDetector {
 	/**
 	 * Recursively collect Schema.org @type values.
 	 *
-	 * @param mixed $data  Decoded JSON-LD data.
-	 * @param array $types Collected schema types.
+	 * @param mixed $data   Decoded JSON-LD data.
+	 * @param array $types  Collected schema types.
 	 * @return void
 	 */
 	private function collect_types( $data, &$types ) {
