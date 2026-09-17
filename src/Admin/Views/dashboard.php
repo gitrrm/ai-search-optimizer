@@ -9,9 +9,26 @@ $max_score  = isset($data['max_score']) ? (int) $data['max_score'] : 100;
 $checks     = isset($data['checks']) ? $data['checks'] : array();
 $results    = isset($data['results']) ? $data['results'] : array();
 $recommendations = isset($data['recommendations']) ? $data['recommendations'] : array();
+$analysis_status = isset($_GET['aso_analysis'])
+	? sanitize_key(wp_unslash($_GET['aso_analysis']))
+	: '';
 ?>
 
 <div class="wrap">
+	<?php if ('success' === $analysis_status) : ?>
+
+		<div class="notice notice-success is-dismissible">
+			<p>
+				<?php
+				esc_html_e(
+					'Analysis refreshed successfully.',
+					'ai-search-optimizer'
+				);
+				?>
+			</p>
+		</div>
+
+	<?php endif; ?>
 
 	<h1><?php esc_html_e('AI Search Optimizer', 'ai-search-optimizer'); ?></h1>
 
@@ -20,6 +37,24 @@ $recommendations = isset($data['recommendations']) ? $data['recommendations'] : 
 		<div class="aso-score-card">
 
 			<h2><?php esc_html_e('AI Visibility Score', 'ai-search-optimizer'); ?></h2>
+
+			<form
+				method="post"
+				action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+				<input
+					type="hidden"
+					name="action"
+					value="aso_run_analysis" />
+
+				<?php wp_nonce_field('aso_run_analysis'); ?>
+
+				<?php submit_button(
+					__('Run Analysis', 'ai-search-optimizer'),
+					'secondary',
+					'submit',
+					false
+				); ?>
+			</form>
 
 			<div class="aso-score">
 				<?php echo esc_html($score); ?>
@@ -140,7 +175,7 @@ $recommendations = isset($data['recommendations']) ? $data['recommendations'] : 
 
 		</div>
 
-		
+
 
 		<?php if (! empty($recommendations)) : ?>
 

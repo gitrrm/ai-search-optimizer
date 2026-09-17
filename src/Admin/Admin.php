@@ -2,6 +2,7 @@
 
 namespace ASO\Admin;
 
+use ASO\Admin\Controllers\DashboardController;
 use ASO\Admin\Pages\SettingsPage;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -23,6 +24,14 @@ class Admin {
 				'register_menu',
 			)
 		);
+
+		add_action(
+			'admin_post_aso_run_analysis',
+			array(
+				$this,
+				'handle_run_analysis',
+			)
+		);
 	}
 
 	public function register_menu() {
@@ -41,5 +50,17 @@ class Admin {
 			'dashicons-chart-line',
 			80
 		);
+	}
+
+	/**
+	 * Handle manual analysis request.
+	 *
+	 * @return void
+	 */
+	public function handle_run_analysis() {
+
+		$controller = new DashboardController();
+
+		$controller->handle_run_analysis();
 	}
 }
