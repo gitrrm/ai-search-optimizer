@@ -141,7 +141,7 @@ $analysis_status = isset($_GET['aso_analysis'])
 						<?php esc_html_e('Check Details', 'ai-search-optimizer'); ?>
 					</h3>
 
-					<?php foreach ($checks as $check) : ?>
+					<?php foreach ($checks as $key => $check) : ?>
 
 						<div class="aso-check-detail">
 
@@ -162,6 +162,14 @@ $analysis_status = isset($_GET['aso_analysis'])
 									<?php endforeach; ?>
 
 								</ul>
+
+							<?php endif; ?>
+
+							<?php if (! empty($results[$key]['error'])) : ?>
+
+								<p class="description">
+									<?php echo esc_html($results[$key]['error']); ?>
+								</p>
 
 							<?php endif; ?>
 
